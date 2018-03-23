@@ -1,5 +1,6 @@
 import numpy as np
 from pyspark import SparkContext
+from pyspark.mllib.linalg import DenseMatrix
 from pyspark.mllib.linalg.distributed import IndexedRowMatrix, RowMatrix
 
 
@@ -33,6 +34,7 @@ class LSI(object):
 			self.s = None
 			self.vsinv = None
 
+
 	def compute(self, dataPath, nTopics):
 		'''Computes SVD factorization
 
@@ -51,33 +53,84 @@ class LSI(object):
 		self.v = svd.V
 		self.s = svd.s
 		
-		# v x s^(-1)
+		# V x S^(-1)
 		self.vsinv = self.v.toArray().dot(np.diag(1./self.s))
 
-	def transform(self, q):
-		'''Transforms a query into SVD space.
-		q2 = q x v x s^(-1)
+		# norm(U) with all-0 column to multiply
+		unorm = np.array(self.u.rows.map(lambda x: x.norm(2)).collect())
+		self.unorm = np.insert(np.asmatrix(unorm).transpose(), 1, 0, axis=1)
+
+
+	def transform(self, d):
+		'''Transforms a document into SVD space.
+		d' = d x v x s^(-1)
 
 		Args:
-			q: list of terms
+			d: numpy array with freqs. --> each position a term
 		'''
 	
-		return q.dot(self.vsinv)
+		return d.dot(self.vsinv)
 		
 
-	def index(self, q):
-		'''
+	def index(self, d):
+		'''Indexes a document into the system (appending to U matrix)
+
+		Args:
+			d: numpy array with freqs. --> each position a term
 		'''
 
-		w = RowMatrix(sc.parallelize(self.transform(q)))
+		w = RowMatrix(sc.parallelize(self.transform(d)))
 		self.u = RowMatrix(self.u.rows.union(w.rows))
 
 
-	def retrieve(self, nResuts):
+	def retrieve(self, q, nResults):
 		'''
 		'''
 
-		pass
+		qp = self.transform(q)
+		
+
+	def getSimilarities(self, w):
+		'''
+		'''
+
+		wspace = self.transform(w)
+		print '---'
+		print wspace
+		distances = self._getCosineDistances(wspace)
+				
+
+	def _getCosineDistances(self, w):
+		'''
+		'''
+
+		wt = w.transpose()
+		wt = DenseMatrix(wt.shape[0], wt.shape[1], wt.flatten())
+		num = self.u.multiply(wt)
+
+		wnorm = np.linalg.norm(w, axis=1)
+		wnorm = np.insert(np.asmatrix(wnorm), 1, 0, axis=0)
+		print '---'
+		print self.unorm	
+		print '---'
+		print self.unorm		
+		print '---'
+		print wnorm
+		print '---'
+		den = np.dot(self.unorm, wnorm)
+		print den
+		distances = num.rows.zipWithIndex().map(lambda x: _getDivisionByNorm(x, den))
+		print '---'
+		print distances.collect()
+		return distances
+
+
+def _getDivisionByNorm(num, den):
+	'''
+	'''
+
+	return np.divide(num[0], den[num[1],:]).flatten()
+
 
 lsi = LSI()
 lsi.compute('dataset.csv', 2)
@@ -89,6 +142,10 @@ print '----- V matrix -----'
 print lsi.v
 print '----- VS^(-1) matrix -----'
 print lsi.vsinv
-lsi.index(np.array([[2,0,0,0],[0,0,0,6],[1,2,0,0],[6,0,0,6]]))
-print '----- New U Matrix -----'
-print lsi.u.rows.collect()
+print '----- |U| vector -----'
+print lsi.unorm
+print '----- similarities -----'
+print lsi.getSimilarities(np.array([[2,0,0,0],[0,0,0,6]]))
+#lsi.index(np.array([[2,0,0,0],[0,0,0,6],[1,2,0,0],[6,0,0,6]]))
+#print '----- New U Matrix -----'
+#print lsi.u.rows.collect()
