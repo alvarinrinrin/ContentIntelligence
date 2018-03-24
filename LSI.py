@@ -83,14 +83,7 @@ class LSI(object):
 		self.u = RowMatrix(self.u.rows.union(w.rows))
 
 
-	def retrieve(self, q, nResults):
-		'''
-		'''
-
-		qp = self.transform(q)
-		
-
-	def getSimilarities(self, w):
+	def retrieve(self, w, nResults):
 		'''
 		'''
 
@@ -103,7 +96,9 @@ class LSI(object):
 		print '-----'
 		distances = self._getCosineDistances(wspace)
 		print distances.flatMap(lambda x: [(i, [x[0], y]) for i, y in enumerate(x[1])])\
+				.sortBy(lambda x: 2 * x[0] + x[1][1], ascending=False)\
 				.reduceByKey(lambda x, y: x + y)\
+				.map(lambda x: _groupInPairs(x[1])[:nResults])\
 				.collect()
 		
 				
@@ -164,6 +159,21 @@ def _getDivisionByNorm(num, den):
 	return (num[1], np.divide(num[0].toArray(), np.squeeze(np.asarray(den[num[1],:][0]))))
 
 
+def _groupInPairs(l):
+	'''
+	'''
+
+	out = []
+	first = True
+	for i, e in enumerate(l):
+		if i % 2 == 0:
+			ePrev = e
+		else:
+			out.append([ePrev, e])
+	return out
+		
+
+
 lsi = LSI()
 lsi.compute('dataset.csv', 2)
 #print '----- U matrix -----'
@@ -176,8 +186,9 @@ lsi.compute('dataset.csv', 2)
 #print lsi.vsinv
 #print '----- |U| vector -----'
 #print lsi.unorm
-similarities = lsi.getSimilarities(np.array([[0,0,0,1,0,1,0,0],\
-					     [1,0,0,0,0,0,0,0]]))
+similarities = lsi.retrieve(np.array([[0,0,0,1,0,1,0,0],
+				      [0,0,0,1,0,0,0,0],
+				      [1,0,1,0,0,0,1,0]]), 2)
 #print '----- similarities:'
 #print similarities
 #lsi.index(np.array([[2,0,0,0],[0,0,0,6],[1,2,0,0],[6,0,0,6]]))
