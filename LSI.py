@@ -13,8 +13,9 @@ class LSI(object):
 	Attributes:
 		u: RowMatrix (document x features)
 		v: DenseMatrix (term x features)
-		s: list of eigenvalues^2
-		vsinv: vs^(-1)
+		s: numpy array of eigenvalues^2 (features)
+		vsinv: numpy array vs^(-1)
+		unorm: numpy array applied norm to u
 
 	Methods:
 		compute
