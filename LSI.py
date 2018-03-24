@@ -56,7 +56,7 @@ class LSI(object):
 		# V x S^(-1)
 		self.vsinv = self.v.toArray().dot(np.diag(1./self.s))
 
-		# norm(U) with all-0 column to multiply
+		# norm(U) with all-0 column to multiply	
 		unorm = np.array(self.u.rows.map(lambda x: x.norm(2)).collect())
 		self.unorm = np.insert(np.asmatrix(unorm).transpose(), 1, 0, axis=1)
 
@@ -94,10 +94,18 @@ class LSI(object):
 		'''
 		'''
 
+		print '----- query de entrada:'
+		print w
+		print '-----'
 		wspace = self.transform(w)
-		print '---'
+		print '----- query transformada:'
 		print wspace
+		print '-----'
 		distances = self._getCosineDistances(wspace)
+		print distances.flatMap(lambda x: [(i, [x[0], y]) for i, y in enumerate(x[1])])\
+				.reduceByKey(lambda x, y: x + y)\
+				.collect()
+		
 				
 
 	def _getCosineDistances(self, w):
@@ -105,23 +113,41 @@ class LSI(object):
 		'''
 
 		wt = w.transpose()
-		wt = DenseMatrix(wt.shape[0], wt.shape[1], wt.flatten())
+		print '----- query transpuesta:'
+		print wt
+		print '-----'
+		print '----- query transpuesta flatten:'
+		print wt.flatten()
+		print wt.shape
+		print '-----'
+		wt = DenseMatrix(wt.shape[0], wt.shape[1], wt.flatten(), isTransposed=True)
+		print '----- query transpuesta y dense matrix:'
+		print wt
+		print '-----'
+		print '----- U:'
+		print self.u.rows.collect()
+		print '-----'
 		num = self.u.multiply(wt)
+		print '----- num;'
+		print num.rows.collect()
+		print '-----'
 
 		wnorm = np.linalg.norm(w, axis=1)
 		wnorm = np.insert(np.asmatrix(wnorm), 1, 0, axis=0)
-		print '---'
+		print '----- U norm:'
 		print self.unorm	
-		print '---'
-		print self.unorm		
-		print '---'
+		print '-----'
+		print '----- W norm:'
 		print wnorm
-		print '---'
+		print '-----'
 		den = np.dot(self.unorm, wnorm)
+		print '----- den:'
 		print den
+		print '-----'
 		distances = num.rows.zipWithIndex().map(lambda x: _getDivisionByNorm(x, den))
-		print '---'
-		print distances.collect()
+		print '----- distances:'
+		print distances
+		print '-----'
 		return distances
 
 
@@ -129,23 +155,31 @@ def _getDivisionByNorm(num, den):
 	'''
 	'''
 
-	return np.divide(num[0], den[num[1],:]).flatten()
+	#print '+++'
+	#print num[0].toArray()
+	#print np.squeeze(np.asarray(den[num[1],:]))
+	#print '+++'
+	#print '---'
+	#print '---'
+	return (num[1], np.divide(num[0].toArray(), np.squeeze(np.asarray(den[num[1],:][0]))))
 
 
 lsi = LSI()
 lsi.compute('dataset.csv', 2)
-print '----- U matrix -----'
-print lsi.u.rows.collect()
-print '----- S vector -----'
-print lsi.s
-print '----- V matrix -----'
-print lsi.v
-print '----- VS^(-1) matrix -----'
-print lsi.vsinv
-print '----- |U| vector -----'
-print lsi.unorm
-print '----- similarities -----'
-print lsi.getSimilarities(np.array([[2,0,0,0],[0,0,0,6]]))
+#print '----- U matrix -----'
+#print lsi.u.rows.collect()
+#print '----- S vector -----'
+#print lsi.s
+#print '----- V matrix -----'
+#print lsi.v
+#print '----- VS^(-1) matrix -----'
+#print lsi.vsinv
+#print '----- |U| vector -----'
+#print lsi.unorm
+similarities = lsi.getSimilarities(np.array([[0,0,0,1,0,1,0,0],\
+					     [1,0,0,0,0,0,0,0]]))
+#print '----- similarities:'
+#print similarities
 #lsi.index(np.array([[2,0,0,0],[0,0,0,6],[1,2,0,0],[6,0,0,6]]))
 #print '----- New U Matrix -----'
 #print lsi.u.rows.collect()
