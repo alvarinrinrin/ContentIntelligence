@@ -189,11 +189,9 @@ print '----- VS^(-1) matrix -----'
 print lsi.vsinv
 print '----- |U| vector -----'
 print lsi.unorm
-#similarities = lsi.retrieve(np.array([[0,0,0,1,0,1,0,0],
-#				      [0,0,0,1,0,0,0,0],
-#				      [1,0,1,0,0,0,1,0]]), 2)
-#print '----- similarities:'
-#print similarities
+similarities = lsi.retrieve(np.array([[1,0,1,0,0,0,0]]), 2)
+print '----- similarities:'
+print similarities.collect()
 #lsi.index(np.array([[2,0,0,0],[0,0,0,6],[1,2,0,0],[6,0,0,6]]))
 #print '----- New U Matrix -----'
 #print lsi.u.rows.collect()
