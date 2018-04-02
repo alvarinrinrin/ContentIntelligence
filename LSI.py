@@ -2,7 +2,7 @@ import numpy as np
 from pyspark import SparkContext
 from pyspark.mllib.linalg import DenseMatrix
 from pyspark.mllib.linalg.distributed import IndexedRowMatrix, RowMatrix
-
+import sparkspacy as ss
 
 sc = SparkContext()
 sc.setLogLevel('WARN')
@@ -47,7 +47,9 @@ class LSI(object):
 			SVD object with 
 		'''
 
-		data = RowMatrix(sc.textFile(dataPath).map(lambda line: [x for x in line.split()]))
+		#data = RowMatrix(sc.textFile(dataPath).map(lambda line: [x for x in line.split()]))
+		data = ss.process(sc, 'docs/')
+		print data.rows.collect()
 		svd = data.computeSVD(nTopics, computeU=True)
 
 		self.u = svd.U
@@ -177,19 +179,19 @@ def _groupInPairs(l):
 
 lsi = LSI()
 lsi.compute('dataset.csv', 2)
-#print '----- U matrix -----'
-#print lsi.u.rows.collect()
-#print '----- S vector -----'
-#print lsi.s
-#print '----- V matrix -----'
-#print lsi.v
-#print '----- VS^(-1) matrix -----'
-#print lsi.vsinv
-#print '----- |U| vector -----'
-#print lsi.unorm
-similarities = lsi.retrieve(np.array([[0,0,0,1,0,1,0,0],
-				      [0,0,0,1,0,0,0,0],
-				      [1,0,1,0,0,0,1,0]]), 2)
+print '----- U matrix -----'
+print lsi.u.rows.collect()
+print '----- S vector -----'
+print lsi.s
+print '----- V matrix -----'
+print lsi.v
+print '----- VS^(-1) matrix -----'
+print lsi.vsinv
+print '----- |U| vector -----'
+print lsi.unorm
+#similarities = lsi.retrieve(np.array([[0,0,0,1,0,1,0,0],
+#				      [0,0,0,1,0,0,0,0],
+#				      [1,0,1,0,0,0,1,0]]), 2)
 #print '----- similarities:'
 #print similarities
 #lsi.index(np.array([[2,0,0,0],[0,0,0,6],[1,2,0,0],[6,0,0,6]]))
