@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import numpy as np
 from pyspark import SparkContext
 from pyspark.mllib.linalg import DenseMatrix
@@ -24,7 +26,12 @@ class LSI(object):
 	'''
 
 	def __init__(self,  uPath=None, vPath=None, sPath=None):
-		'''
+		'''Initializates LSI object
+
+		Args:
+			uPath	
+			vPath
+			sPath
 		'''
 
 		if uPath <> None and vPath <> None and sPath <> None:
@@ -40,16 +47,14 @@ class LSI(object):
 		'''Computes SVD factorization
 
 		Args:
-			dataset: RowMatrix containing data
-			nFeatures: number of resulting features
+			dataPath: documents folder
+			nTopics: number of resulting features
 	
 		Returns:
 			SVD object with 
 		'''
 
-		#data = RowMatrix(sc.textFile(dataPath).map(lambda line: [x for x in line.split()]))
-		data = ss.process(sc, 'docs/')
-		print data.rows.collect()
+		data = ss.process(sc, dataPath)
 		svd = data.computeSVD(nTopics, computeU=True)
 
 		self.u = svd.U
@@ -66,6 +71,7 @@ class LSI(object):
 
 	def transform(self, d):
 		'''Transforms a document into SVD space.
+
 		d' = d x v x s^(-1)
 
 		Args:
@@ -87,65 +93,49 @@ class LSI(object):
 
 
 	def retrieve(self, w, nResults):
-		'''
+		'''Retrieves the identifiers of more similar documents (and similarity)
+
+		Args:
+			w: numpy array, each row a document, each column a term freq
+			nResults: how many results you want
+
+		Returns:
+			sorted list of (doc_id, similarity)
 		'''
 
-		print '----- query de entrada:'
-		print w
-		print '-----'
 		wspace = self.transform(w)
-		print '----- query transformada:'
-		print wspace
-		print '-----'
 		distances = self._getCosineDistances(wspace)
-		print distances.flatMap(lambda x: [(i, [x[0], y]) for i, y in enumerate(x[1])])\
+		return distances.flatMap(lambda x: [(i, [x[0], y]) for i, y in enumerate(x[1])])\
 				.sortBy(lambda x: 2 * x[0] + x[1][1], ascending=False)\
 				.reduceByKey(lambda x, y: x + y)\
 				.map(lambda x: _groupInPairs(x[1])[:nResults])\
 				.collect()
-		
 				
 
 	def _getCosineDistances(self, w):
-		'''
+		'''Gets cosine distances between documents in w and existing in self.u
+
+		w * u / |w| * |u|
+
+		Args:
+			w: numpy array in SVD space, each row a document, each column topic val
+
+		Returns:
+			distances
 		'''
 
+		# Numerator
 		wt = w.transpose()
-		print '----- query transpuesta:'
-		print wt
-		print '-----'
-		print '----- query transpuesta flatten:'
-		print wt.flatten()
-		print wt.shape
-		print '-----'
 		wt = DenseMatrix(wt.shape[0], wt.shape[1], wt.flatten(), isTransposed=True)
-		print '----- query transpuesta y dense matrix:'
-		print wt
-		print '-----'
-		print '----- U:'
-		print self.u.rows.collect()
-		print '-----'
 		num = self.u.multiply(wt)
-		print '----- num;'
-		print num.rows.collect()
-		print '-----'
 
+		# Denominator
 		wnorm = np.linalg.norm(w, axis=1)
 		wnorm = np.insert(np.asmatrix(wnorm), 1, 0, axis=0)
-		print '----- U norm:'
-		print self.unorm	
-		print '-----'
-		print '----- W norm:'
-		print wnorm
-		print '-----'
 		den = np.dot(self.unorm, wnorm)
-		print '----- den:'
-		print den
-		print '-----'
+		
 		distances = num.rows.zipWithIndex().map(lambda x: _getDivisionByNorm(x, den))
-		print '----- distances:'
-		print distances
-		print '-----'
+		
 		return distances
 
 
@@ -153,12 +143,6 @@ def _getDivisionByNorm(num, den):
 	'''
 	'''
 
-	#print '+++'
-	#print num[0].toArray()
-	#print np.squeeze(np.asarray(den[num[1],:]))
-	#print '+++'
-	#print '---'
-	#print '---'
 	return (num[1], np.divide(num[0].toArray(), np.squeeze(np.asarray(den[num[1],:][0]))))
 
 
@@ -178,7 +162,7 @@ def _groupInPairs(l):
 
 
 lsi = LSI()
-lsi.compute('dataset.csv', 2)
+lsi.compute('docs/', 2)
 print '----- U matrix -----'
 print lsi.u.rows.collect()
 print '----- S vector -----'
@@ -191,7 +175,4 @@ print '----- |U| vector -----'
 print lsi.unorm
 similarities = lsi.retrieve(np.array([[1,0,1,0,0,0,0]]), 2)
 print '----- similarities:'
-print similarities.collect()
-#lsi.index(np.array([[2,0,0,0],[0,0,0,6],[1,2,0,0],[6,0,0,6]]))
-#print '----- New U Matrix -----'
-#print lsi.u.rows.collect()
+print similarities
